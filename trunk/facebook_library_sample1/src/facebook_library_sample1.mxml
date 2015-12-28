@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:WindowedApplication xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute"
+	applicationComplete="init()">
+<mx:Script>
+	<![CDATA[
+		import com.facebook.data.stream.StreamStoryData;
+		import mx.collections.ArrayCollection;
+		import com.facebook.data.stream.GetStreamData;
+		import mx.controls.Alert;
+		import com.facebook.commands.stream.GetStream;
+		import com.facebook.data.users.GetInfoData;
+		import com.facebook.commands.users.GetInfo;
+		import com.facebook.data.users.GetInfoFieldValues;
+		import com.facebook.net.FacebookCall;
+		import com.facebook.data.users.FacebookUser;
+		import com.facebook.events.FacebookEvent;
+		import com.facebook.utils.FacebookSessionUtil;
+		import com.facebook.Facebook;
+		
+		private var fbook:Facebook;
+		private var session: FacebookSessionUtil;
+		
+		[Bindable]
+		private var streamData:ArrayCollection = new ArrayCollection();
+	
+		private function init():void {
+			fbook = new Facebook();
+			session=new FacebookSessionUtil("070926fd6ed02fc52a42dd54c58414e4","aab6e61d4195eef47c8488a2b3ee7fca", loaderInfo);
+			fbook=session.facebook; 
+			session.addEventListener(FacebookEvent.CONNECT, onConnect);
+			session.login();
+		}
+		
+		private function onConnect(e:FacebookEvent):void{
+			var call:FacebookCall = fbook.post(new GetInfo([fbook.uid],[GetInfoFieldValues.ALL_VALUES]));
+			call.addEventListener(FacebookEvent.COMPLETE, onGetInfo);
+			getStream();
+		}
+		private function onGetInfo(e:FacebookEvent):void {
+			var user:FacebookUser = (e.data as GetInfoData).userCollection.getItemAt(0) as FacebookUser;
+			txtTitle.text = "hello " + user.name;
+		}
+		
+		private function getStream():void {
+			var getStreamCall:GetStream = new GetStream(fbook.uid, null, null, null, 20);
+			getStreamCall.addEventListener(FacebookEvent.COMPLETE, onGetStream, false, 0, true);
+			fbook.post(getStreamCall);
+		}
+		private function onGetStream(event:FacebookEvent):void {
+			if (event.success == false) {
+				Alert.show("onGetStream failed="+event.error.errorCode+". msg="+event.error.errorMsg);
+				if (event.error.errorCode == 13) {
+					Alert.show("you need to grant the application permission to read your stream.  you will be navigated to the page to grant the permission");
+					fbook.grantExtendedPermission("read_stream");
+				}
+			} else {
+				var result:GetStreamData = event.data as GetStreamData;
+				
+				//for (var i:int=0;i<result.stories.length;i++) {
+				//	var streamStoryData:StreamStoryData = result.stories.getItemAt(i) as StreamStoryData;
+				//	streamData.addItem(streamStoryData);
+				//}
+				
+				datStream.dataProvider = result.stories.source;
+				Alert.show("get # of stores=" + result.stories.length);
+			}
+		}
+		
+		private function onConfirmLogin():void {
+		    this.removeChild(loginbutton);
+			session.validateLogin()
+		}
+		
+	]]>
+</mx:Script>
+	<mx:Button id="loginbutton" label="Click after you log into Facebook" click="onConfirmLogin()" />
+	<mx:Label y="30" id="txtTitle" text="Hello you"/>
+	<mx:DataGrid id="datStream" dataProvider="{streamData}" x="0" y="60" height="90%">
+	</mx:DataGrid>
+</mx:WindowedApplication>
